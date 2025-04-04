@@ -1,52 +1,101 @@
 using Photon.Pun;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class TeacherController : MonoBehaviourPun
 {
-    public string[] questions = { "What is 2+2?", "What is the capital of France?" };
-    public string[][] answers = {
-        new string[] { "3", "4", "5", "6" },
-        new string[] { "Berlin", "Madrid", "Paris", "Rome" }
-    };
+    private int correctAnswerIndex;
+    private List<int> currentOptions;
+
     public Text questionText;
     public Button[] answerButtons;
-    private string selectedAnswer;
 
     private int currentQuestionIndex = 0;
+
+    List<object> Question_Generator()
+    {
+        int num1 = Random.Range(10, 100);
+        int num2 = Random.Range(10, 100);
+        char[] oper = { '+', '-', '*', '/' };
+        int index = Random.Range(0, oper.Length);
+        char ope = oper[index];
+        string que = "";
+        int ans = 0;
+
+        if (ope == '/')
+        {
+            int mul = num1 * num2;
+            que = mul.ToString() + " " + ope + " " + num2.ToString();
+            num1 = mul;
+        }
+        else
+        {
+            que = num1.ToString() + " " + ope + " " + num2.ToString();
+        }
+
+        switch (ope)
+        {
+            case '+': ans = num1 + num2; break;
+            case '-': ans = num1 - num2; break;
+            case '*': ans = num1 * num2; break;
+            case '/': ans = num1 / num2; break;
+        }
+
+        return new List<object> { que, ans };
+    }
+
+    (List<int>, int) AnswerOptions(int ans)
+    {
+        List<int> opt = new List<int>();
+
+        while (opt.Count < 3)
+        {
+            int randomOption = Random.Range(ans - 50, ans + 50);
+            if (randomOption != ans && !opt.Contains(randomOption))
+                opt.Add(randomOption);
+        }
+
+        int correctIndex = Random.Range(0, 4);
+        opt.Insert(correctIndex, ans);
+
+        return (opt, correctIndex);
+    }
 
     private void Start()
     {
         PhotonNetwork.IsMessageQueueRunning = true;
         for (int i = 0; i < answerButtons.Length; i++)
         {
-            int index = i; // Capture correct index
-            answerButtons[i].onClick.AddListener(() => SendAnswer(answerButtons[index].GetComponentInChildren<Text>().text));
+            int index = i;
+            answerButtons[i].onClick.AddListener(() => SendAnswer(index));
         }
     }
+
     public void SendQuestion()
     {
-        if (currentQuestionIndex < questions.Length)
-        {
-            photonView.RPC("ReceiveQuestion", RpcTarget.Others, questions[currentQuestionIndex], answers[currentQuestionIndex][0], answers[currentQuestionIndex][1], answers[currentQuestionIndex][2], answers[currentQuestionIndex][3]);
-        }
+        List<object> question = Question_Generator();
+        (currentOptions, correctAnswerIndex) = AnswerOptions((int)question[1]);
+        photonView.RPC("ReceiveQuestion", RpcTarget.Others, question[0], currentOptions.ToArray(), correctAnswerIndex);
     }
 
     [PunRPC]
-    public void ReceiveAnswer(string studentName, string answer)
+    public void ReceiveAnswer(string studentName, int optionPressed)
     {
-        Debug.Log(studentName + " answered: " + answer);
-
-        if (answer == answers[currentQuestionIndex][1]) // Assuming correct answer is at index 1
+        if (ValidateAnswer(optionPressed))
         {
-            Debug.Log("Correct answer! Sending next question.");
-            currentQuestionIndex++;
+            Debug.Log(studentName + " answered correctly!");
             SendQuestion();
         }
         else
         {
-            Debug.Log("Wrong answer. Waiting for another attempt.");
+            Debug.Log(studentName + " gave the wrong answer. Waiting for another attempt.");
         }
+    }
+
+    bool ValidateAnswer(int optionPressed)
+    {
+        return optionPressed == correctAnswerIndex;
     }
 
     private void Update()
@@ -57,19 +106,19 @@ public class TeacherController : MonoBehaviourPun
         }
     }
 
-
     [PunRPC]
-    public void ReceiveQuestion(string question, string answer1, string answer2, string answer3, string answer4)
+    public void ReceiveQuestion(string question, int[] options, int correctIndex)
     {
         questionText.text = question;
-        answerButtons[0].GetComponentInChildren<Text>().text = answer1;
-        answerButtons[1].GetComponentInChildren<Text>().text = answer2;
-        answerButtons[2].GetComponentInChildren<Text>().text = answer3;
-        answerButtons[3].GetComponentInChildren<Text>().text = answer4;
+        for (int i = 0; i < 4; i++)
+        {
+            answerButtons[i].GetComponentInChildren<Text>().text = options[i].ToString();
+        }
+        correctAnswerIndex = correctIndex;
     }
 
-    public void SendAnswer(string answer)
+    public void SendAnswer(int optionNumber)
     {
-        photonView.RPC("ReceiveAnswer", RpcTarget.MasterClient, PhotonNetwork.NickName, answer);
+        photonView.RPC("ReceiveAnswer", RpcTarget.MasterClient, PhotonNetwork.NickName, optionNumber);
     }
 }

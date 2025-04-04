@@ -1285,9 +1285,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17a82d6ef5a20ed48a700d9e202f8729, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  questions:
-  - What is 2+2?
-  - What is the capital of France?
   questionText: {fileID: 210656079}
   answerButtons:
   - {fileID: 1634771009}
