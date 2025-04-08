@@ -152,7 +152,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
         */
         foreach(string playerName in scores.Keys)
         {
-            playerList.AppendLine(playerName + scores[playerName].ToString());
+            playerList.AppendLine(playerName + ": "+scores[playerName].ToString());
         }
 
         playerListText.text = playerList.ToString();
