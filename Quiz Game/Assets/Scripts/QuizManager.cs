@@ -20,6 +20,12 @@ public class QuizManager : MonoBehaviourPunCallbacks
     private float timer = 0f;
     private bool isTimerRunning = false;
     private float questionInterval = 10f;
+    private int lastSentSecond = 0;
+
+    [SerializeField] GameObject teacherPanel;
+    [SerializeField] GameObject studentPanel;
+    [SerializeField] GameObject blockOptions;
+    [SerializeField] Text timerText;
 
 
     Dictionary<string, int> scores = new Dictionary<string, int>();
@@ -59,12 +65,13 @@ public class QuizManager : MonoBehaviourPunCallbacks
     (List<int>, int) AnswerOptions(int ans)
     {
         List<int> opt = new List<int>();
-
+        List<int> optionsRange = new List<int>(){-40, -30, -20, -10, 10, 20, 30, 40};
         while (opt.Count < 3)
         {
-            int randomOption = Random.Range(ans - 50, ans + 50);
-            if (randomOption != ans && !opt.Contains(randomOption))
-                opt.Add(randomOption);
+            int randomIndex = Random.Range(0, optionsRange.Count);
+            int randomOption = optionsRange[randomIndex];
+            optionsRange.Remove(randomOption);
+            opt.Add(ans+randomOption);
         }
 
         int correctIndex = Random.Range(0, 4);
@@ -81,6 +88,16 @@ public class QuizManager : MonoBehaviourPunCallbacks
             int index = i;
             answerButtons[i].onClick.AddListener(() => SendAnswer(index));
         }
+        if (PhotonNetwork.IsMasterClient)
+        {
+            teacherPanel.SetActive(true);
+            studentPanel.SetActive(false);
+        }
+        else
+        {
+            teacherPanel.SetActive(false);
+            studentPanel.SetActive(true);
+        }
     }
 
     public void SendQuestion()
@@ -90,6 +107,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
         photonView.RPC("ReceiveQuestion", RpcTarget.Others, question[0], currentOptions.ToArray(), correctAnswerIndex);
 
         timer = 0f;
+        lastSentSecond = 0;
         isTimerRunning = true;
     }
 
@@ -98,11 +116,11 @@ public class QuizManager : MonoBehaviourPunCallbacks
     {
         if (ValidateAnswer(optionPressed))
         {
-            UpdateScores(studentName, 10);
+            UpdateScores(studentName, 100);
         }
         else
         {
-            UpdateScores(studentName, -5);
+            UpdateScores(studentName, -25);
         }
     }
 
@@ -113,20 +131,36 @@ public class QuizManager : MonoBehaviourPunCallbacks
 
     private void Update()
     {
-        if (isTimerRunning)
+        if (PhotonNetwork.IsMasterClient)
         {
-            timer += Time.deltaTime;
-            if (timer >= questionInterval)
+            if (isTimerRunning)
             {
-                isTimerRunning = false;
-                SendQuestion();
+                timer += Time.deltaTime;
+                int currentSecond = Mathf.FloorToInt(timer);
+                if (currentSecond > lastSentSecond)
+                {
+                    lastSentSecond = currentSecond;
+                    photonView.RPC("ReceiveTimerSecond", RpcTarget.Others, currentSecond);
+                }
+                if (timer >= questionInterval)
+                {
+                    isTimerRunning = false;
+                    SendQuestion();
+                }
             }
         }
     }
 
     [PunRPC]
+    void ReceiveTimerSecond(int second)
+    {
+        timerText.text = "Timer: " + (10-second);
+    }
+
+    [PunRPC]
     public void ReceiveQuestion(string question, int[] options, int correctIndex)
     {
+        blockOptions.SetActive(false);
         questionText.text = question;
         for (int i = 0; i < 4; i++)
         {
@@ -137,6 +171,15 @@ public class QuizManager : MonoBehaviourPunCallbacks
 
     public void SendAnswer(int optionNumber)
     {
+        blockOptions.SetActive(true);
+        if (ValidateAnswer(optionNumber))
+        {
+            
+        }
+        else
+        {
+
+        }
         photonView.RPC("ReceiveAnswer", RpcTarget.MasterClient, PhotonNetwork.NickName, optionNumber);
     }
 
