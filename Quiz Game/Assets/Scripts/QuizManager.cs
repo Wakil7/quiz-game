@@ -26,20 +26,24 @@ public class QuizManager : MonoBehaviourPunCallbacks
     [SerializeField] GameObject studentPanel;
     [SerializeField] GameObject blockOptions;
     [SerializeField] Text timerText;
+    [SerializeField] Text scoreText;
     [SerializeField] TextMeshProUGUI roomCodeText;
     [SerializeField] Sprite redBtnSprite;
     [SerializeField] Sprite greenBtnSprite;
     [SerializeField] Sprite blueBtnSprite;
+    public static int numberOfQuestions;
+    private int count;
 
     public GameObject rowPrefab;
     public Transform contentParent;
     private Dictionary<string, LeaderboardEntry> leaderboardEntries = new Dictionary<string, LeaderboardEntry>();
 
-    Dictionary<string, int> scores = new Dictionary<string, int>();
+    //Dictionary<string, int> scores = new Dictionary<string, int>();
 
     private void Start()
     {
         PhotonNetwork.IsMessageQueueRunning = true;
+        count = 0;
         for (int i = 0; i < answerButtons.Length; i++)
         {
             int index = i;
@@ -118,6 +122,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
         timer = 0f;
         lastSentSecond = 0;
         isTimerRunning = true;
+        count++;
     }
 
     [PunRPC]
@@ -125,12 +130,27 @@ public class QuizManager : MonoBehaviourPunCallbacks
     {
         if (ValidateAnswer(optionPressed))
         {
-            AddOrUpdateEntry(studentName, 100);
+            AddOrUpdateEntry(studentName, 10*(int)Mathf.Ceil(questionInterval - timer));
         }
         else
         {
-            AddOrUpdateEntry(studentName, -25);
+            AddOrUpdateEntry(studentName, -2*(int)Mathf.Ceil(questionInterval - timer));
         }
+        Player currentPlayer = null;
+        foreach (Player player in PhotonNetwork.PlayerList)
+        {
+            if (player.NickName.Equals(studentName))
+            {
+                currentPlayer = player;
+                break;
+            }
+        }
+        photonView.RPC("ReceiveScore", currentPlayer, leaderboardEntries[studentName].GetScore());
+    }
+    [PunRPC]
+    public void ReceiveScore(int score)
+    {
+        scoreText.text = score.ToString();
     }
 
     bool ValidateAnswer(int optionPressed)
@@ -151,10 +171,14 @@ public class QuizManager : MonoBehaviourPunCallbacks
                     lastSentSecond = currentSecond;
                     photonView.RPC("ReceiveTimerSecond", RpcTarget.Others, currentSecond);
                 }
-                if (timer >= questionInterval)
+                if (timer >= questionInterval && count < numberOfQuestions)
                 {
                     isTimerRunning = false;
                     SendQuestion();
+                }
+                if (count == numberOfQuestions)
+                {
+                    // Declare Winner
                 }
             }
         }
@@ -163,7 +187,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
     [PunRPC]
     void ReceiveTimerSecond(int second)
     {
-        timerText.text = (10-second).ToString();
+        timerText.text = ((int)questionInterval - second).ToString();
     }
 
     [PunRPC]

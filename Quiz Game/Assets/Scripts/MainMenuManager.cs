@@ -73,7 +73,7 @@ public class MainMenuManager : MonoBehaviourPunCallbacks
     [SerializeField] GameObject teacherPanel;
     //[SerializeField] GameObject tempObject;
 
-    [SerializeField] TMP_InputField teacherNameField;
+    [SerializeField] TMP_InputField numberOfQuestions;
     [SerializeField] TMP_InputField studentNameField;
     [SerializeField] TMP_InputField roomCodeField;
 
@@ -133,9 +133,10 @@ public class MainMenuManager : MonoBehaviourPunCallbacks
 
     public void OnCreateRoomBtnClick()
     {
-        string teacherName = teacherNameField.text;
+        //string teacherName = teacherNameField.text;
+        QuizManager.numberOfQuestions = int.Parse(numberOfQuestions.text);
         roomCode = Random.Range(1000, 9999).ToString();
-        PhotonNetwork.NickName = teacherName;
+        PhotonNetwork.NickName = "Teacher";
         PhotonNetwork.CreateRoom(roomCode);
         //roomCodeText.text = "Your room code is: " + roomCode;
         Debug.Log(roomCode);
