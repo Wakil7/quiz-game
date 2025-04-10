@@ -11,7 +11,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
     private int correctAnswerIndex;
     private List<int> currentOptions;
 
-    public Text questionText;
+    public TextMeshProUGUI questionText;
     public Button[] answerButtons;
     public TextMeshProUGUI playerListText;
 
@@ -26,10 +26,37 @@ public class QuizManager : MonoBehaviourPunCallbacks
     [SerializeField] GameObject studentPanel;
     [SerializeField] GameObject blockOptions;
     [SerializeField] Text timerText;
+    [SerializeField] TextMeshProUGUI roomCodeText;
+    [SerializeField] Sprite redBtnSprite;
+    [SerializeField] Sprite greenBtnSprite;
+    [SerializeField] Sprite blueBtnSprite;
 
+    public GameObject rowPrefab;
+    public Transform contentParent;
+    private Dictionary<string, LeaderboardEntry> leaderboardEntries = new Dictionary<string, LeaderboardEntry>();
 
     Dictionary<string, int> scores = new Dictionary<string, int>();
 
+    private void Start()
+    {
+        PhotonNetwork.IsMessageQueueRunning = true;
+        for (int i = 0; i < answerButtons.Length; i++)
+        {
+            int index = i;
+            answerButtons[i].onClick.AddListener(() => SendAnswer(index));
+        }
+        if (PhotonNetwork.IsMasterClient)
+        {
+            teacherPanel.SetActive(true);
+            studentPanel.SetActive(false);
+            roomCodeText.text = "Room Code: " + MainMenuManager.roomCode;
+        }
+        else
+        {
+            teacherPanel.SetActive(false);
+            studentPanel.SetActive(true);
+        }
+    }
     List<object> Question_Generator()
     {
         int num1 = Random.Range(10, 100);
@@ -80,25 +107,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
         return (opt, correctIndex);
     }
 
-    private void Start()
-    {
-        PhotonNetwork.IsMessageQueueRunning = true;
-        for (int i = 0; i < answerButtons.Length; i++)
-        {
-            int index = i;
-            answerButtons[i].onClick.AddListener(() => SendAnswer(index));
-        }
-        if (PhotonNetwork.IsMasterClient)
-        {
-            teacherPanel.SetActive(true);
-            studentPanel.SetActive(false);
-        }
-        else
-        {
-            teacherPanel.SetActive(false);
-            studentPanel.SetActive(true);
-        }
-    }
+    
 
     public void SendQuestion()
     {
@@ -116,11 +125,11 @@ public class QuizManager : MonoBehaviourPunCallbacks
     {
         if (ValidateAnswer(optionPressed))
         {
-            UpdateScores(studentName, 100);
+            AddOrUpdateEntry(studentName, 100);
         }
         else
         {
-            UpdateScores(studentName, -25);
+            AddOrUpdateEntry(studentName, -25);
         }
     }
 
@@ -154,7 +163,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
     [PunRPC]
     void ReceiveTimerSecond(int second)
     {
-        timerText.text = "Timer: " + (10-second);
+        timerText.text = (10-second).ToString();
     }
 
     [PunRPC]
@@ -165,6 +174,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
         for (int i = 0; i < 4; i++)
         {
             answerButtons[i].GetComponentInChildren<Text>().text = options[i].ToString();
+            answerButtons[i].GetComponent<Image>().sprite = blueBtnSprite;
         }
         correctAnswerIndex = correctIndex;
     }
@@ -174,25 +184,22 @@ public class QuizManager : MonoBehaviourPunCallbacks
         blockOptions.SetActive(true);
         if (ValidateAnswer(optionNumber))
         {
-            
+            answerButtons[optionNumber].GetComponent<Image>().sprite = greenBtnSprite;
         }
         else
         {
+            answerButtons[correctAnswerIndex].GetComponent<Image>().sprite = greenBtnSprite;
+            answerButtons[optionNumber].GetComponent<Image>().sprite = redBtnSprite;
 
         }
         photonView.RPC("ReceiveAnswer", RpcTarget.MasterClient, PhotonNetwork.NickName, optionNumber);
     }
-
+    /*
     private void UpdatePlayerList()
     {
         
         StringBuilder playerList = new StringBuilder("Connected Players:\n");
-        /*
-        foreach (Player player in PhotonNetwork.PlayerList)
-        {
-            playerList.AppendLine(player.NickName);
-        }
-        */
+        
         foreach(string playerName in scores.Keys)
         {
             playerList.AppendLine(playerName + ": "+scores[playerName].ToString());
@@ -200,22 +207,33 @@ public class QuizManager : MonoBehaviourPunCallbacks
 
         playerListText.text = playerList.ToString();
     }
+*/
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
-        scores.Add(newPlayer.NickName, 0);
-        UpdatePlayerList();
+        AddOrUpdateEntry(newPlayer.NickName, 0);
     }
 
-    private void UpdateScores(string name, int score)
-    {
-        scores[name] = scores[name] + score;
-        UpdatePlayerList();
-    }
+    
 
     public void OnStartClick()
     {
         SendQuestion();
+    }
+
+    public void AddOrUpdateEntry(string roll, int score)
+    {
+        if (leaderboardEntries.ContainsKey(roll))
+        {
+            leaderboardEntries[roll].UpdateScore(leaderboardEntries[roll].GetScore() + score);
+        }
+        else
+        {
+            GameObject row = Instantiate(rowPrefab, contentParent);
+            LeaderboardEntry entry = row.GetComponent<LeaderboardEntry>();
+            entry.SetData(roll, score);
+            leaderboardEntries.Add(roll, entry);
+        }
     }
 
 }
