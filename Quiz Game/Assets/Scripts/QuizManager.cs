@@ -117,7 +117,8 @@ public class QuizManager : MonoBehaviourPunCallbacks
     {
         List<object> question = Question_Generator();
         (currentOptions, correctAnswerIndex) = AnswerOptions((int)question[1]);
-        photonView.RPC("ReceiveQuestion", RpcTarget.Others, question[0], currentOptions.ToArray(), correctAnswerIndex);
+        if (count<numberOfQuestions)
+            photonView.RPC("ReceiveQuestion", RpcTarget.Others, question[0], currentOptions.ToArray(), correctAnswerIndex);
 
         timer = 0f;
         lastSentSecond = 0;
@@ -165,6 +166,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
             if (isTimerRunning)
             {
                 timer += Time.deltaTime;
+                if (timer >= 10f) timer = 10f;
                 int currentSecond = Mathf.FloorToInt(timer);
                 if (currentSecond > lastSentSecond)
                 {
@@ -176,10 +178,7 @@ public class QuizManager : MonoBehaviourPunCallbacks
                     isTimerRunning = false;
                     SendQuestion();
                 }
-                if (count == numberOfQuestions)
-                {
-                    // Declare Winner
-                }
+                
             }
         }
     }
